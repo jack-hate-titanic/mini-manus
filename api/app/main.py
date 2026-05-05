@@ -1,12 +1,23 @@
+'''
+Author: 悦者生存 1002783067@qq.com
+Date: 2026-05-01 22:02:48
+LastEditors: 悦者生存 1002783067@qq.com
+LastEditTime: 2026-05-03 19:53:35
+FilePath: /mini-manus/api/app/main.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 import logging
 
 from fastapi import FastAPI
+from app.infrastructure.storage.redis import get_redis_client
 from core.config import get_settings
 from app.infrastructure.endpoints.routes import router as api_router
 from app.infrastructure.logging import setup_logging
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from app.interfaces.errors.exception_handlers import register_exception_handlers
+from app.infrastructure.storage.cos import get_cos_client
+from app.infrastructure.storage.postgres import get_postgres_client
 
 
 
@@ -30,10 +41,26 @@ openai_tags = [
 async def lifespan(app: FastAPI):
     logger.info('应用正在启动...')
 
+    # 4. 初始化Redis连接
+    redis_client = get_redis_client()
+    await redis_client.init()
+
+    # 5. 初始化PostgreSQL连接
+    postgres_client = get_postgres_client()
+    await postgres_client.init()
+
+    # 6. cos客户端初始化
+    cos_client = get_cos_client()
+    await cos_client.init()
+
+
     try:
         # lifespan节点/分界
         yield
-    finally:
+    finally:    
+        await redis_client.close()  
+        await postgres_client.close()
+        await cos_client.close()
         logger.info('应用正在关闭...')
 
 app = FastAPI(
